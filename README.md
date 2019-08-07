@@ -1,8 +1,8 @@
-# My cool new model
+# Fake news classifier
 
 ## Abstract
 
-This is what the model uses & what it does.
+A fake news classifier based on the LIAR-PLUS dataset.
 
 ## Getting Started
 
@@ -45,5 +45,4 @@ Here are some graphs and tables.
 
 ## References
 
-* [Some awesome paper](www.github.com/rshwndsz)
-* [Great blog](www.github.com/rshwndsz)
+* [Where is your Evidence: Improving Fact-checking by Justification Modeling](https://aclweb.org/anthology/W18-5513)
