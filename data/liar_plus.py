@@ -1,8 +1,10 @@
 import torch
 from torchtext import data, vocab
 import spacy
-import os
+import logging
 from config import config as cfg
+
+logger = logging.getLogger('liar_plus')
 
 en = spacy.load('en')
 
@@ -11,13 +13,14 @@ def tokenize(sentence):
     return [tok.text for tok in en.tokenizer(sentence)]
 
 
+# pre-trained vectors support only lower
 ID = data.Field(lower=True, sequential=False)
 LABEL = data.Field(lower=True, sequential=False)
-STATEMENT = data.Field(tokenize=tokenize)
-CONTEXT = data.Field(tokenize=tokenize)
-JUSTIFICATION = data.Field(tokenize=tokenize)
-WORD = data.Field(sequential=False)
-LIST = data.Field(tokenize=tokenize)
+STATEMENT = data.Field(lower=True, tokenize=tokenize)
+CONTEXT = data.Field(lower=True, tokenize=tokenize)
+JUSTIFICATION = data.Field(lower=True, tokenize=tokenize)
+WORD = data.Field(lower=True, sequential=False)
+LIST = data.Field(lower=True, tokenize=tokenize)
 COUNT = data.Field(sequential=False, dtype=torch.float64, use_vocab=False)
 
 fields = [('id', None),
@@ -38,6 +41,7 @@ fields = [('id', None),
           ('justification', JUSTIFICATION)
           ]
 
+logger.debug('Reading TSV files...')
 train_set, val_set, test_set = data.TabularDataset.splits(
                                 path=cfg.dataset_root,
                                 train='train2.tsv',
@@ -48,8 +52,10 @@ train_set, val_set, test_set = data.TabularDataset.splits(
                                )
 
 
+logger.debug('Reading glove vectors...')
 vec = vocab.Vectors('glove.6B.100d.txt', '../datasets/glove_embeddings')
 
+logger.debug('Building vocabulary...')
 STATEMENT.build_vocab(train_set, val_set, max_size=100000, vectors=vec)
 JUSTIFICATION.build_vocab(train_set, val_set, max_size=100000, vectors=vec)
 CONTEXT.build_vocab(train_set, val_set, max_size=100000, vectors=vec)
@@ -57,6 +63,7 @@ WORD.build_vocab(train_set, val_set)
 LABEL.build_vocab(train_set, val_set)
 LIST.build_vocab(train_set, val_set)
 
+logger.debug('Done preparing datasets.')
 
 train_dl = data.BucketIterator(train_set,
                                batch_size=cfg.batch_size,
@@ -74,22 +81,3 @@ test_dl = data.BucketIterator(test_set,
                               batch_size=cfg.test_batch_size,
                               device=cfg.device
                               )
-
-
-class BatchGenerator:
-    def __init__(self, dl, attributes):
-        """A wrapper class for torch-text batches"""
-        self.dl, self.attributes = dl, attributes
-
-    def __len__(self):
-        return len(self.dl)
-
-    def __iter__(self):
-        for batch in self.dl:
-            result = {}
-            for attribute in self.attributes:
-                result[attribute] = getattr(batch, attribute)
-            yield result
-
-
-train_loader = BatchGenerator(train_dl, train_set.fields)
