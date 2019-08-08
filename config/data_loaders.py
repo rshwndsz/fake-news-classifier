@@ -1,6 +1,6 @@
-# from data import data_set_name
+from data import liar_plus
 
 
-# train_loader = data_set_name.train_loader
-# val_loader = data_set_name.val_loader
-# test_loader = data_set_name.val_loader
+train_loader = liar_plus.train_loader
+# val_loader = liar_plus.val_loader
+# test_loader = liar_plus.val_loader

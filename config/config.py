@@ -16,7 +16,7 @@ min_val_loss = 1000
 
 
 # Data-specific
-project_root = os.getcwd()
+project_root = '~/myProjects/fake-news-classifier'
 dataset_root = os.path.join(project_root, 'datasets', 'LIAR_PLUS')
 model_path = os.path.join(project_root, 'checkpoints', 'model_best.pth')
 model_final_path = os.path.join(project_root, 'checkpoints', 'model_final.pth')
@@ -24,6 +24,8 @@ results_dir = os.path.join(project_root, 'results')
 
 
 # Hyper-parameters
-batch_size = 1
+batch_size = 8
+val_batch_size = 1
+test_batch_size = 1
 n_epochs = 2
 lr = 0.01

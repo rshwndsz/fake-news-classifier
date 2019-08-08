@@ -5,7 +5,7 @@ from . import config as cfg
 from models import SampleNet
 
 
-model_name = 'SampleNet'
+model_name = 'FakeNewsDetector'
 model = SampleNet().to(cfg.device)
 criterion = F.cross_entropy
 optimizer = optim.Adam(model.parameters())
