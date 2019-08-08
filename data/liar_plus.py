@@ -1,8 +1,10 @@
 import torch
 from torchtext import data, vocab
 import spacy
+import os
 import logging
 from config import config as cfg
+from . import preprocessing
 
 logger = logging.getLogger('liar_plus')
 
@@ -13,7 +15,7 @@ def tokenize(sentence):
     return [tok.text for tok in en.tokenizer(sentence)]
 
 
-# pre-trained vectors support only lower
+# pre-trained vectors support only lower case
 ID = data.Field(lower=True, sequential=False)
 LABEL = data.Field(lower=True, sequential=False)
 STATEMENT = data.Field(lower=True, tokenize=tokenize)
@@ -41,7 +43,12 @@ fields = [('id', None),
           ('justification', JUSTIFICATION)
           ]
 
-logger.debug('Reading TSV files...')
+logger.debug('Preparing TSV files...')
+preprocessing.prepare_tsv(os.path.join(cfg.project_root, 'datasets', 'LIAR_PLUS', 'train2.tsv'), 'train')
+preprocessing.prepare_tsv(os.path.join(cfg.project_root, 'datasets', 'LIAR_PLUS', 'val2.tsv'), 'val')
+preprocessing.prepare_tsv(os.path.join(cfg.project_root, 'datasets', 'LIAR_PLUS', 'test2.tsv'), 'test')
+
+logger.debug('Reading TSV files from cache/ ...')
 train_set, val_set, test_set = data.TabularDataset.splits(
                                 path=cfg.dataset_root,
                                 train='train2.tsv',
