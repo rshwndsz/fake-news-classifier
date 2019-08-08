@@ -17,7 +17,7 @@ min_val_loss = 1000
 
 # Data-specific
 project_root = os.getcwd()
-dataset_root = os.path.join(project_root, 'datasets', 'dataset_name')
+dataset_root = os.path.join(project_root, 'datasets', 'LIAR_PLUS')
 model_path = os.path.join(project_root, 'checkpoints', 'model_best.pth')
 model_final_path = os.path.join(project_root, 'checkpoints', 'model_final.pth')
 results_dir = os.path.join(project_root, 'results')
