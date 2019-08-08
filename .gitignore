@@ -125,3 +125,6 @@ dmypy.json
 
 # Mac specific
 .DS_Store
+
+# dataset specific
+datasets/glove_embeddings/
