@@ -45,20 +45,19 @@ text.vocab.load_vectors(pretrained_vectors)
 
 logger.debug(f'Done preparing datasets.\nVocab Vector shape: {text.vocab.vectors.shape}')
 
-train_dl = data.BucketIterator(train_set,
-                               batch_size=cfg.batch_size,
-                               device=cfg.device,
-                               shuffle=True
-                               )
+train_loader = data.BucketIterator(train_set,batch_size=cfg.batch_size,
+                                   device=cfg.device,
+                                   shuffle=True
+                                   )
 
-val_dl = data.BucketIterator(val_set,
-                             batch_size=cfg.val_batch_size,
-                             device=cfg.device,
-                             shuffle=True
-                             )
+val_loader = data.BucketIterator(val_set,
+                                 batch_size=cfg.val_batch_size,
+                                 device=cfg.device,
+                                 shuffle=True
+                                 )
 
-test_dl = data.BucketIterator(test_set,
-                              batch_size=cfg.test_batch_size,
-                              device=cfg.device
-                              )
+test_loader = data.BucketIterator(test_set,
+                                  batch_size=cfg.test_batch_size,
+                                  device=cfg.device
+                                  )
 logger.debug('Created Iterator for train/val/test. Done with data prep!')
