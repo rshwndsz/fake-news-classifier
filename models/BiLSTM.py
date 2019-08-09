@@ -1,5 +1,10 @@
 import torch
 import torch.nn as nn
+import logging
+import coloredlogs
+
+logger = logging.getLogger('models/BiLSTM.py')
+coloredlogs.install(level='DEBUG', logger=logger)
 
 
 class BiLSTM(nn.Module):
@@ -12,6 +17,7 @@ class BiLSTM(nn.Module):
                  dropout_prob=0.2,
                  binary=False):
         """Baseline Bidirectional LSTM """
+
         super(BiLSTM, self).__init__()
 
         self.hidden_dim = hidden_dim
@@ -28,15 +34,20 @@ class BiLSTM(nn.Module):
                             bidirectional=True)
 
         if binary:
-            self.classifier = nn.Linear(hidden_dim * lstm_layer * 2, 2)
+            self.classifier = nn.Linear(hidden_dim * lstm_layer * 2, 1)
         else:
             self.classifier = nn.Linear(hidden_dim * lstm_layer * 2, 6)
 
         self.dropout = nn.Dropout(p=dropout_prob)
 
     def forward(self, x):
+        # logger.debug(f'Input shape: {x.shape}')
         x = self.embedding(x)
+        # logger.debug(f'Shape of x: {x.shape}')
         x = torch.transpose(x, dim0=1, dim1=0)
+        # logger.debug(f'Shape of x: {x.shape}')
         lstm_out, (h_n, c_n) = self.lstm(x)
+        # logger.debug(f'Shape of lstm_out: {lstm_out.shape} h_n: {h_n.shape} c_n: {c_n.shape}')
         out = self.classifier(self.dropout(torch.cat([c_n[i, :, :] for i in range(c_n.shape[0])], dim=1)))
+        # logger.debug(f'Shape of out: {out.shape}')
         return out
