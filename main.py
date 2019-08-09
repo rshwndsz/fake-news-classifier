@@ -134,11 +134,20 @@ def train(model,
                     val_prediction = (view == view.max(dim=1, keepdim=True)[0]).view_as(val_prediction)
                     logger.debug(f'val_prediction: {val_prediction}')
 
-                    val_record.append({'step': step,
-                                       'loss': np.mean(val_loss),
-                                       'accuracy': accuracy_score(val_label.view(-1).cpu().detach().numpy(),
-                                                                  val_prediction.view(-1).cpu().detach().numpy())
-                                       })
+                    if binary:
+                        val_label[:, 2:4] = 0   # Don't count half true and barely true
+                        val_prediction[:, 2:4] = 0
+                        val_record.append({'step': step,
+                                           'loss': np.mean(val_loss),
+                                           'accuracy': accuracy_score(val_label.view(-1).cpu().detach().numpy(),
+                                                                      val_prediction.view(-1).cpu().detach().numpy())
+                                           })
+                    else:
+                        val_record.append({'step': step,
+                                           'loss': np.mean(val_loss),
+                                           'accuracy': accuracy_score(val_label.view(-1).cpu().detach().numpy(),
+                                                                      val_prediction.view(-1).cpu().detach().numpy())
+                                           })
 
                     logger.info('step {}/ epoch {} - train_loss {:.4f} - val_loss {:.4f} - val_acc {:4f}'.format(
                         step, epoch, np.mean(losses), val_record[-1]['loss'], val_record[-1]['accuracy']))

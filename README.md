@@ -19,11 +19,12 @@ cd fake-news-classifier
 mkdir datasets/
 ```
 Download the `LIAR_PLUS` dataset into `datasets/LIAR_PLUS` and the pretrained word vectors 
-`wiki-news-300d-1M.vec` into `datasets/word_embeddings`.
+`wiki-news-300d-1M.vec` from [fasttext](https://dl.fbaipublicfiles.com/fasttext/vectors-english/wiki-news-300d-1M.vec.zip) 
+into `datasets/word_embeddings`.
 
 ### Training
 
-Run the project (for binary classification)
+Train the model (for binary classification)
 
 ```bash
 python main.py --phase train --binary yes

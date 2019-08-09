@@ -33,11 +33,9 @@ class BiLSTM(nn.Module):
                             dropout=dropout_prob,
                             bidirectional=True)
 
-        if binary:
-            self.classifier = nn.Linear(hidden_dim * lstm_layer * 2, 1)
-        else:
-            self.classifier = nn.Linear(hidden_dim * lstm_layer * 2, 6)
+        self.classifier = nn.Linear(hidden_dim * lstm_layer * 2, 6)
 
+        self.bn = nn.BatchNorm1d()
         self.dropout = nn.Dropout(p=dropout_prob)
 
     def forward(self, x):
@@ -45,6 +43,7 @@ class BiLSTM(nn.Module):
         x = self.embedding(x)
         # logger.debug(f'Shape of x: {x.shape}')
         x = torch.transpose(x, dim0=1, dim1=0)
+        x = self.bn(x)
         # logger.debug(f'Shape of x: {x.shape}')
         lstm_out, (h_n, c_n) = self.lstm(x)
         # logger.debug(f'Shape of lstm_out: {lstm_out.shape} h_n: {h_n.shape} c_n: {c_n.shape}')
