@@ -129,3 +129,5 @@ dmypy.json
 # dataset specific
 datasets/word_embeddings/
 .vector_cache/
+datasets/LIAR_PLUS
+cache
