@@ -37,12 +37,12 @@ def prepare_tsv(tsv_path, mode='train'):
 
     # Convert labels to integers
     # See: https://stackoverflow.com/a/23307361
-    labels = {'true': 1,
-              'mostly-true': 2,
-              'half-true': 3,
-              'barely-true': 4,
-              'false': 5,
-              'pants-fire': 6}
+    labels = {'true': 0,
+              'mostly-true': 1,
+              'half-true': 2,
+              'barely-true': 3,
+              'false': 4,
+              'pants-fire': 5}
     df['label'] = df['label'].map(labels)
     # See: https://stackoverflow.com/a/22391554
     logger.info(f"{mode}_set stats:\n{df['label'].value_counts()}")

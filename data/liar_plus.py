@@ -59,7 +59,6 @@ val_loader = data.BucketIterator(val_set,
                                  batch_size=cfg.val_batch_size,
                                  sort_key=lambda x: len(x.text),
                                  device=cfg.device,
-                                 train=False,
                                  shuffle=True,
                                  sort=False
                                  )
