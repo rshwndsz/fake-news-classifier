@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
+# import torch.nn.functional as F
 import argparse
 import logging
 import coloredlogs
@@ -89,8 +89,6 @@ def train(model,
             # Move (text, label) to device
             text = train_batch.text.to(device)
             label = train_batch.label.type(torch.LongTensor).to(device)
-            # See: https://discuss.pytorch.org/t/convert-int-into-one-hot-format/507/33
-            label = nn.functional.one_hot(label, num_classes=6).type(torch.FloatTensor)
             logger.debug(f'Shape of label: {label.shape}')
             logger.debug(f'Label: {label}')
 
@@ -99,6 +97,7 @@ def train(model,
             prediction = model.forward(text)
             logger.debug(f'Shape of prediction: {prediction.shape}')
             logger.debug(f'Prediction: {prediction}')
+            label = label.type(torch.LongTensor)
             loss = criterion(prediction, label)
 
             # Collect losses
@@ -121,11 +120,19 @@ def train(model,
                     # Load (text, label) onto device
                     val_text = val_batch.text.to(device)
                     val_label = val_batch.label.to(device).type(torch.LongTensor)
-                    val_label = nn.functional.one_hot(val_label, num_classes=6).type(torch.FloatTensor)
 
                     # Forward pass and collect loss
                     val_prediction = model.forward(val_text).to(device)
                     val_loss.append(criterion(val_prediction, val_label).cpu().data.detach().numpy())
+
+                    # One hot representation
+                    # See: https://discuss.pytorch.org/t/convert-int-into-one-hot-format/507/33
+                    val_label = nn.functional.one_hot(val_label, num_classes=6).type(torch.FloatTensor)
+                    logger.debug(f'val_label: {val_label}')
+                    # Convert predictions to binary
+                    view = val_prediction.view(-1, 6)
+                    val_prediction = (view == view.max(dim=1, keepdim=True)[0]).view_as(val_prediction)
+                    logger.debug(f'val_prediction: {val_prediction}')
 
                     val_record.append({'step': step,
                                        'loss': np.mean(val_loss),
@@ -172,6 +179,13 @@ def load(binary):
 
 # noinspection PyShadowingNames
 def test(test_loader, binary=False):
+    """
+    Test the model on the test set
+
+    :param test_loader: Data loader for the test set
+    :param binary: if True binary classification
+    :return Accuracy
+    """
     model, m_info = load(binary)
     logger.info(f'Model info: {m_info}')
 
@@ -192,12 +206,17 @@ def test(test_loader, binary=False):
 
         # Forward pass and collect loss
         test_prediction = model.forward(test_text).to(cfg.device)
+        view = test_prediction.view(-1, 6)
+        test_prediction = (view == view.max(dim=1, keepdim=True)[0]).view_as(test_prediction)
+
         test_loss.append(criterion(test_prediction, test_label).cpu().data.detach().numpy())
         test_acc.append(accuracy_score(test_label.view(-1).cpu().detach().numpy(),
                                        test_prediction.view(-1).cpu().detach().numpy()))
 
         logger.info('step {} - test_loss {:.4f} - test_acc {:4f}'.format(
             step, np.mean(test_loss), np.mean(test_acc)))
+
+    return np.mean(test_acc)
 
 
 if __name__ == '__main__':
@@ -213,7 +232,7 @@ if __name__ == '__main__':
         args.binary = False
 
     model = arch.model
-    criterion = F.cross_entropy()
+    criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()),
                            lr=cfg.lr)
 
@@ -236,7 +255,8 @@ if __name__ == '__main__':
               binary=args.binary)
 
     elif args.phase == 'test':
-        test(model, args.binary)
+        acc = test(model, args.binary)
+        print(f'Final accuracy: {acc}')
 
     else:
         raise ValueError('Choose one of train/test.')
