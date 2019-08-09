@@ -1,4 +1,6 @@
 import torch
+import torch.nn as nn
+import torch.optim as optim
 import argparse
 import logging
 import coloredlogs
@@ -25,7 +27,24 @@ def train(model,
           resume_from_epoch=0,
           early_stop=1,
           warmup_epoch=2,
+          binary=False
           ):
+    """
+    Training loop
+
+    :param model: Model to be trained
+    :param optimizer: Optimizer used
+    :param criterion: Loss function
+    :param n_epochs: Number of epochs for training
+    :param eval_every: Validation frequency
+    :param train_loader: Data loader for the training set
+    :param val_loader: Data loader for the validation set
+    :param device: 'cpu' or 'cuda'
+    :param resume_from_epoch: Start training from epoch
+    :param early_stop: Number of epochs to wait before ending training
+    :param warmup_epoch: Number of warmup/debug epochs
+    :param binary: if True models are saved with _binary in path
+    """
 
     step = 0
     max_loss = 1e5
@@ -106,62 +125,78 @@ def train(model,
                                 'step': step,
                                 'epoch': epoch,
                                 'train_loss': np.mean(losses),
-                                'val_loss': val_record[-1]['loss'],
-                            })
+                                'val_loss': val_record[-1]['loss']},
+                                 binary=binary)
                             max_loss = val_record[-1]['loss']
                             no_improve_in_previous_epoch = False
 
 
-def save(m, info):
+def save(m, info, binary):
     """Helper function to save model"""
-    torch.save(info, 'best_model.info')
-    torch.save(m, 'best_model.m')
+    if binary:
+        torch.save(info, 'best_model_binary.info')
+        torch.save(m, 'best_model_binary.m')
+    else:
+        torch.save(info, 'best_model_hex.info')
+        torch.save(m, 'best_model_hex.m')
 
 
-def load():
+def load(binary):
     """Helper function to load model"""
-    m = torch.load('best_model.m')
-    info = torch.load('best_model.info')
+    if binary:
+        m = torch.load('best_model_binary.m')
+        info = torch.load('best_model_binary.info')
+    else:
+        m = torch.load('best_model_hex.m')
+        info = torch.load('best_model_hex.info')
     return m, info
 
 
-def val(model):
-    """
-    Check model accuracy on validation set.
+# noinspection PyShadowingNames
+def test(test_loader, binary=False):
+    model, m_info = load(binary)
+    logger.info(f'Model info: {m_info}')
 
-    :param model: Model to be tested
-    :return: Validation accuracy
-    """
-    # validation
+    model.lstm.flatten_parameters()
 
+    model.eval()
 
-def test(model):
-    # testing
-    pass
+    test_predictions = []
+    test_labels = []
+    test_loader.init_epoch()
+    for test_batch in iter(test_loader):
+        text = test_batch.text.cuda()
+        test_labels += test_batch.label.data.numpy().tolist()
+        test_predictions += torch.sigmoid(model.forward(text).view(-1)).cpu().data.numpy().tolist()
+
+    # TODO Compute metrics
 
 
 if __name__ == '__main__':
     # CLI
     parser = argparse.ArgumentParser(description=f'CLI for {arch.model_name}')
     parser.add_argument('--phase', type=str, default='train')
+    parser.add_argument('--binary', type=bool, default=False)
     args = parser.parse_args()
 
-    model = arch.model
-    optimizer = arch.optimizer
-    criterion = arch.criterion
-    resume_from_epoch = cfg.resume_from_epoch
-    max_val_accuracy = cfg.min_val_loss
-
-    if args.load:
-        # Load from checkpoint
-        checkpoint = torch.load(cfg.model_path)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        resume_from_epoch = checkpoint['epoch']
-        min_val_loss = checkpoint['val_loss']
+    model = arch.model_binary if args.binary else arch.model_hex
+    criterion = nn.BCEWithLogitsLoss()
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()),
+                           lr=cfg.lr)
 
     if args.phase == 'train':
-        train(model, optimizer, criterion, resume_from_epoch, max_val_accuracy)
+        train(model=model,
+              optimizer=optimizer,
+              criterion=criterion,
+              n_epochs=cfg.n_epochs,
+              eval_every=cfg.val_freq,
+              train_loader=dl.train_loader,
+              val_loader=dl.val_loader,
+              device=cfg.device,
+              resume_from_epoch=cfg.resume_from_epoch,
+              early_stop=1,
+              warmup_epoch=2,
+              binary=args.binary)
 
     elif args.phase == 'test':
         test(model)
