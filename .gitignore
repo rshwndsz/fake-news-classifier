@@ -127,4 +127,5 @@ dmypy.json
 .DS_Store
 
 # dataset specific
-datasets/glove_embeddings/
+datasets/word_embeddings/
+.vector_cache/
