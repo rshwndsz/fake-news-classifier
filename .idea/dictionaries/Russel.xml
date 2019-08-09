@@ -12,6 +12,7 @@
       <w>quotechar</w>
       <w>spacy</w>
       <w>tokenized</w>
+      <w>warmup</w>
       <w>yimin</w>
     </words>
   </dictionary>
