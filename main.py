@@ -5,14 +5,17 @@ import argparse
 import logging
 import coloredlogs
 import numpy as np
+from sklearn.metrics import accuracy_score
 
 from config import (config as cfg,
                     architecture as arch,
                     data_loaders as dl)
 
 # Setup colorful logging
-logger = logging.getLogger(__name__)
-coloredlogs.install(level='INFO', logger=logger)
+logging.basicConfig()
+logger = logging.getLogger('main.py')
+logger.root.setLevel(logging.DEBUG)
+coloredlogs.install(level='DEBUG', logger=logger)
 
 
 # noinspection PyShadowingNames
@@ -75,6 +78,7 @@ def train(model,
 
         # Training in PyTorch
         for train_batch in iter(train_loader):
+            logger.info('Training Model...')
             step += 1
             # Set model in training mode
             model.train()
@@ -82,10 +86,10 @@ def train(model,
             # Move (text, label) to device
             text = train_batch.text.to(device)
             label = train_batch.label.type(torch.Tensor).to(device)
-
             # Standard training loop
             model.zero_grad()
             prediction = model.forward(text).view(-1)
+            # logger.debug(f'Shape of prediction: {prediction.shape}')
             loss = criterion(prediction, label)
 
             # Collect losses
@@ -98,6 +102,7 @@ def train(model,
 
             # Validation every `eval_every`
             if step % eval_every == 0:
+                logger.info('Validating Model...')
                 # Set model in eval mode
                 model.eval()
                 model.zero_grad()
@@ -106,17 +111,19 @@ def train(model,
                 for val_batch in iter(val_loader):
                     # Load (text, label) onto device
                     val_text = val_batch.text.to(device)
-                    val_label = val_batch.text.to(device)
+                    val_label = val_batch.text.to(device).view(-1).float()
 
                     # Forward pass and collect loss
-                    val_prediction = model.forward(val_text).view(-1)
+                    val_prediction = model.forward(val_text).view(-1).to(device)
                     val_loss.append(criterion(val_prediction, val_label).cpu().data.numpy())
 
                     val_record.append({'step': step,
-                                       'loss': np.mean(val_loss)})
+                                       'loss': np.mean(val_loss),
+                                       'accuracy': accuracy_score(val_label, val_prediction)
+                                       })
 
-                    logger.info('epoch {:02} - step {:06} - train_loss {:.4f} - val_loss {:.4f} '.format(
-                        epoch, step, np.mean(losses), val_record[-1]['loss']))
+                    logger.info('step {}/epoch {} - train_loss {:.4f} - val_loss {:.4f} - val_acc {:4f}'.format(
+                        step, epoch, np.mean(losses), val_record[-1]['loss'], val_record[-1]['accuracy']))
 
                     # Save best model
                     if epoch >= warmup_epoch:
@@ -165,7 +172,7 @@ def test(test_loader, binary=False):
     test_labels = []
     test_loader.init_epoch()
     for test_batch in iter(test_loader):
-        text = test_batch.text.cuda()
+        text = test_batch.text.to(cfg.device)
         test_labels += test_batch.label.data.numpy().tolist()
         test_predictions += torch.sigmoid(model.forward(text).view(-1)).cpu().data.numpy().tolist()
 
@@ -176,13 +183,22 @@ if __name__ == '__main__':
     # CLI
     parser = argparse.ArgumentParser(description=f'CLI for {arch.model_name}')
     parser.add_argument('--phase', type=str, default='train')
-    parser.add_argument('--binary', type=bool, default=False)
+    parser.add_argument('--binary', type=str, default='no')
     args = parser.parse_args()
+
+    if args.binary == 'yes':
+        args.binary = True
+    elif args.binary == 'no':
+        args.binary = False
 
     model = arch.model_binary if args.binary else arch.model_hex
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()),
                            lr=cfg.lr)
+
+    logger.info(f'Using model: {model}')
+    logger.info(f'Using criterion: {criterion}')
+    logger.info(f'Using optimizer: {optimizer}')
 
     if args.phase == 'train':
         train(model=model,
