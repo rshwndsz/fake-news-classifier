@@ -2,6 +2,7 @@ import torch
 import argparse
 import logging
 import coloredlogs
+import numpy as np
 
 from config import (config as cfg,
                     architecture as arch,
@@ -13,21 +14,115 @@ coloredlogs.install(level='INFO', logger=logger)
 
 
 # noinspection PyShadowingNames
-def train(model, optimizer, criterion, resume_from_epoch, min_val_loss):
-    """
-    Train the model
+def train(model,
+          optimizer,
+          criterion,
+          n_epochs,
+          eval_every,
+          train_loader,
+          val_loader,
+          device,
+          resume_from_epoch=0,
+          early_stop=1,
+          warmup_epoch=2,
+          ):
 
-    :param model: Model to be trained
-    :param optimizer: Method to compute gradients
-    :param criterion: Criterion for computing loss
-    :param resume_from_epoch: Resume training from this epoch
-    :param min_val_loss: Save models with lesser loss value on val set
-    """
-    for epoch in range(resume_from_epoch, cfg.n_epochs):
-        # training
-        if epoch % cfg.val_freq == 0:
-            # validation & saving best model
-            pass
+    step = 0
+    max_loss = 1e5
+    no_improve_epoch = 0
+    no_improve_in_previous_epoch = False
+    fine_tuning = False
+    train_record = []
+    val_record = []
+    losses = []
+
+    for epoch in range(resume_from_epoch, n_epochs):
+        # Early Stopping
+        if epoch >= warmup_epoch:
+            if no_improve_in_previous_epoch:
+                no_improve_epoch += 1
+                if no_improve_epoch >= early_stop:
+                    break
+            else:
+                no_improve_epoch = 0
+            no_improve_in_previous_epoch = True
+
+        # Fine tuning
+        if not fine_tuning and epoch >= warmup_epoch:
+            model.embedding.weight.requires_grad = True
+            fine_tuning = True
+
+        train_loader.init_epoch()
+
+        # Training in PyTorch
+        for train_batch in iter(train_loader):
+            step += 1
+            # Set model in training mode
+            model.train()
+
+            # Move (text, label) to device
+            text = train_batch.text.to(device)
+            label = train_batch.label.type(torch.Tensor).to(device)
+
+            # Standard training loop
+            model.zero_grad()
+            prediction = model.forward(text).view(-1)
+            loss = criterion(prediction, label)
+
+            # Collect losses
+            losses.append(loss.cpu().data.numpy())
+            train_record.append(loss.cpu().data.numpy())
+
+            # Back-prop
+            loss.backward()
+            optimizer.step()
+
+            # Validation every `eval_every`
+            if step % eval_every == 0:
+                # Set model in eval mode
+                model.eval()
+                model.zero_grad()
+
+                val_loss = []
+                for val_batch in iter(val_loader):
+                    # Load (text, label) onto device
+                    val_text = val_batch.text.to(device)
+                    val_label = val_batch.text.to(device)
+
+                    # Forward pass and collect loss
+                    val_prediction = model.forward(val_text).view(-1)
+                    val_loss.append(criterion(val_prediction, val_label).cpu().data.numpy())
+
+                    val_record.append({'step': step,
+                                       'loss': np.mean(val_loss)})
+
+                    logger.info('epoch {:02} - step {:06} - train_loss {:.4f} - val_loss {:.4f} '.format(
+                        epoch, step, np.mean(losses), val_record[-1]['loss']))
+
+                    # Save best model
+                    if epoch >= warmup_epoch:
+                        if val_record[-1]['loss'] <= max_loss:
+                            save(m=model, info={
+                                'step': step,
+                                'epoch': epoch,
+                                'train_loss': np.mean(losses),
+                                'val_loss': val_record[-1]['loss'],
+                            })
+                            max_loss = val_record[-1]['loss']
+                            no_improve_in_previous_epoch = False
+
+
+def save(m, info):
+    """Helper function to save model"""
+    torch.save(info, 'best_model.info')
+    torch.save(m, 'best_model.m')
+
+
+def load():
+    """Helper function to load model"""
+    m = torch.load('best_model.m')
+    info = torch.load('best_model.info')
+    return m, info
 
 
 def val(model):
@@ -49,7 +144,6 @@ if __name__ == '__main__':
     # CLI
     parser = argparse.ArgumentParser(description=f'CLI for {arch.model_name}')
     parser.add_argument('--phase', type=str, default='train')
-    parser.add_argument('--load', type=bool, default=False)
     args = parser.parse_args()
 
     model = arch.model
@@ -73,4 +167,4 @@ if __name__ == '__main__':
         test(model)
 
     else:
-        raise ValueError('Choose one of train/validate/test')
+        raise ValueError('Choose one of train/test')
