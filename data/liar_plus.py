@@ -8,7 +8,7 @@ from . import preprocessing
 
 logger = logging.getLogger('liar_plus')
 
-en = spacy.load('en')
+en = spacy.load('en_core_web_sm')
 
 
 def tokenize(sentence):
@@ -43,7 +43,7 @@ fields = [('id', None),
           ('justification', JUSTIFICATION)
           ]
 
-logger.debug('Preparing TSV files...')
+logger.debug('Pre-processing TSV files...')
 preprocessing.prepare_tsv(os.path.join(cfg.project_root, 'datasets', 'LIAR_PLUS', 'train2.tsv'), 'train')
 preprocessing.prepare_tsv(os.path.join(cfg.project_root, 'datasets', 'LIAR_PLUS', 'val2.tsv'), 'val')
 preprocessing.prepare_tsv(os.path.join(cfg.project_root, 'datasets', 'LIAR_PLUS', 'test2.tsv'), 'test')
@@ -60,12 +60,12 @@ train_set, val_set, test_set = data.TabularDataset.splits(
 
 
 logger.debug('Reading glove vectors...')
-vec = vocab.Vectors('glove.6B.100d.txt', '../datasets/glove_embeddings')
+pretrained_vectors = vocab.Vectors('glove.6B.100d.txt', '../datasets/glove_embeddings')
 
 logger.debug('Building vocabulary...')
-STATEMENT.build_vocab(train_set, val_set, max_size=100000, vectors=vec)
-JUSTIFICATION.build_vocab(train_set, val_set, max_size=100000, vectors=vec)
-CONTEXT.build_vocab(train_set, val_set, max_size=100000, vectors=vec)
+STATEMENT.build_vocab(train_set, val_set, max_size=100000, vectors=pretrained_vectors)
+JUSTIFICATION.build_vocab(train_set, val_set, max_size=100000, vectors=pretrained_vectors)
+CONTEXT.build_vocab(train_set, val_set, max_size=100000, vectors=pretrained_vectors)
 WORD.build_vocab(train_set, val_set)
 LABEL.build_vocab(train_set, val_set)
 LIST.build_vocab(train_set, val_set)
