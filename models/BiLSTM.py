@@ -9,12 +9,9 @@ class BiLSTM(nn.Module):
                  static=True,
                  hidden_dim=128,
                  lstm_layer=2,
-                 dropout_prob=0.2):
-        """
-        Baseline Bidirectional LSTM
-
-        Adapted from: https://www.kaggle.com/ziliwang/baseline-pytorch-bilstm
-        """
+                 dropout_prob=0.2,
+                 binary=False):
+        """Baseline Bidirectional LSTM """
         super(BiLSTM, self).__init__()
 
         self.hidden_dim = hidden_dim
@@ -30,7 +27,10 @@ class BiLSTM(nn.Module):
                             dropout=dropout_prob,
                             bidirectional=True)
 
-        self.classifier = nn.Linear(hidden_dim * lstm_layer * 2, 6)
+        if binary:
+            self.classifier = nn.Linear(hidden_dim * lstm_layer * 2, 2)
+        else:
+            self.classifier = nn.Linear(hidden_dim * lstm_layer * 2, 6)
 
         self.dropout = nn.Dropout(p=dropout_prob)
 

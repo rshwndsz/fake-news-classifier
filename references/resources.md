@@ -13,3 +13,7 @@ Proceedings of the Association for Information Science and Technology 52, no. 1 
 
 * [Kaggle - toxic comments EDA by jagangupta](https://www.kaggle.com/jagangupta/stop-the-s-toxic-comments-eda)
 * [Kaggle - spooky NLP modelling by arthurtok (word clouds)](https://www.kaggle.com/arthurtok/spooky-nlp-and-topic-modelling-tutorial)
+
+## BiLSTM
+
+* [LSTM](https://www.kaggle.com/ziliwang/baseline-pytorch-bilstm)
