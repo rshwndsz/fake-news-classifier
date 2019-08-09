@@ -35,10 +35,31 @@ def prepare_tsv(tsv_path, mode='train'):
     df['context'] = df['context'].str.replace("\n", " ")
     df['justification'] = df['justification'].str.replace("\n", " ")
 
+    # Credits: https://stackoverflow.com/a/32529152
+    df['text'] = df[['statement', 'justification', 'context']].apply(lambda x: ' '.join(x), axis=1)
+
+    # Credits: https://stackoverflow.com/a/33378952
+    df['metadata'] = df.apply(lambda row: {'subjects': row['subjects'],
+                                           'speaker': row['speaker'],
+                                           'speaker_title': row['speaker_title'],
+                                           'state_info': row['state_info'],
+                                           'party': row['party'],
+                                           'credit_history': {
+                                               'barely_true': row['barely_true'],
+                                               'false': row['false'],
+                                               'half_true': row['half_true'],
+                                               'mostly_true': row['mostly_true'],
+                                               'pants_on_fire': row['pants_on_fire']
+                                                }
+                                           }, axis=1)
+
+    # Credits: https://stackoverflow.com/a/34683105
+    clean_df = df.filter(['text', 'label', 'metadata'])
+
     # Save cleaned up files in cache/
     if mode == 'train':
-        df.to_csv(os.path.join(cfg.project_root, 'cache', 'train.tsv'), sep='\t', index=False, header=False)
+        clean_df.to_csv(os.path.join(cfg.project_root, 'cache', 'train.tsv'), sep='\t', index=False, header=False)
     elif mode == 'val':
-        df.to_csv(os.path.join(cfg.project_root, 'cache', 'val.tsv'), sep='\t', index=False, header=False)
+        clean_df.to_csv(os.path.join(cfg.project_root, 'cache', 'val.tsv'), sep='\t', index=False, header=False)
     elif mode == 'test':
-        df.to_csv(os.path.join(cfg.project_root, 'cache', 'test.tsv'), sep='\t', index=False, header=False)
+        clean_df.to_csv(os.path.join(cfg.project_root, 'cache', 'test.tsv'), sep='\t', index=False, header=False)

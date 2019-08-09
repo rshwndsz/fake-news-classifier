@@ -1,13 +1,12 @@
-import torch
-from torchtext import data, vocab
-import spacy
 import os
+from torchtext import data, vocab
 import logging
+import spacy
+
 from config import config as cfg
 from . import preprocessing
 
-logger = logging.getLogger('liar_plus')
-
+logger = logging.getLogger(__name__)
 en = spacy.load('en_core_web_sm')
 
 
@@ -15,40 +14,18 @@ def tokenize(sentence):
     return [tok.text for tok in en.tokenizer(sentence)]
 
 
-# pre-trained vectors support only lower case
-ID = data.Field(lower=True, sequential=False)
-LABEL = data.Field(lower=True, sequential=False)
-STATEMENT = data.Field(lower=True, tokenize=tokenize)
-CONTEXT = data.Field(lower=True, tokenize=tokenize)
-JUSTIFICATION = data.Field(lower=True, tokenize=tokenize)
-WORD = data.Field(lower=True, sequential=False)
-LIST = data.Field(lower=True, tokenize=tokenize)
-COUNT = data.Field(sequential=False, dtype=torch.float64, use_vocab=False)
-
-fields = [('id', None),
-          ('json_id', WORD),
-          ('label', LABEL),
-          ('statement', STATEMENT),
-          ('subjects', LIST),
-          ('speaker', WORD),
-          ('speaker_title', WORD),
-          ('state_info', WORD),
-          ('party', WORD),
-          ('barely_true', COUNT),
-          ('false', COUNT),
-          ('half_true', COUNT),
-          ('mostly_true', COUNT),
-          ('pants_on_fire', COUNT),
-          ('context', CONTEXT),
-          ('justification', JUSTIFICATION)
-          ]
-
 logger.debug('Pre-processing TSV files...')
-preprocessing.prepare_tsv(os.path.join(cfg.project_root, 'datasets', 'LIAR_PLUS', 'train2.tsv'), 'train')
-preprocessing.prepare_tsv(os.path.join(cfg.project_root, 'datasets', 'LIAR_PLUS', 'val2.tsv'), 'val')
-preprocessing.prepare_tsv(os.path.join(cfg.project_root, 'datasets', 'LIAR_PLUS', 'test2.tsv'), 'test')
+preprocessing.prepare_tsv(os.path.join(cfg.dataset_root, 'train2.tsv'), 'train')
+preprocessing.prepare_tsv(os.path.join(cfg.dataset_root, 'val2.tsv'), 'val')
+preprocessing.prepare_tsv(os.path.join(cfg.dataset_root, 'test2.tsv'), 'test')
 
-logger.debug('Reading TSV files from cache/ ...')
+
+text = data.Field(lower=True, batch_first=True, tokenize=tokenize)
+fields = [('text', text),
+          ('label', data.Field(lower=True, sequential=False, use_vocab=False, is_target=True)),
+          ('metadata', None)]
+
+logger.debug('Reading cleaned TSV files...')
 train_set, val_set, test_set = data.TabularDataset.splits(
                                 path=cfg.dataset_root,
                                 train='train2.tsv',
@@ -58,19 +35,15 @@ train_set, val_set, test_set = data.TabularDataset.splits(
                                 fields=fields
                                )
 
-
-logger.debug('Reading glove vectors...')
-pretrained_vectors = vocab.Vectors('glove.6B.100d.txt', '../datasets/glove_embeddings')
-
 logger.debug('Building vocabulary...')
-STATEMENT.build_vocab(train_set, val_set, max_size=100000, vectors=pretrained_vectors)
-JUSTIFICATION.build_vocab(train_set, val_set, max_size=100000, vectors=pretrained_vectors)
-CONTEXT.build_vocab(train_set, val_set, max_size=100000, vectors=pretrained_vectors)
-WORD.build_vocab(train_set, val_set)
-LABEL.build_vocab(train_set, val_set)
-LIST.build_vocab(train_set, val_set)
+text.build_vocab(train_set, val_set, min_freq=3)
 
-logger.debug('Done preparing datasets.')
+logger.debug('Loading glove vectors...')
+pretrained_vectors = vocab.Vectors(os.path.join(cfg.dataset_root,
+                                                'glove_embeddings/glove.6B.100d.txt'))
+text.vocab.load_vectors(pretrained_vectors)
+
+logger.debug(f'Done preparing datasets.\nVocab Vector shape: {text.vocab.vectors.shape}')
 
 train_dl = data.BucketIterator(train_set,
                                batch_size=cfg.batch_size,
@@ -88,3 +61,4 @@ test_dl = data.BucketIterator(test_set,
                               batch_size=cfg.test_batch_size,
                               device=cfg.device
                               )
+logger.debug('Created Iterator for train/val/test. Done with data prep!')
