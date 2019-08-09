@@ -49,5 +49,6 @@ class BiLSTM(nn.Module):
         lstm_out, (h_n, c_n) = self.lstm(x)
         # logger.debug(f'Shape of lstm_out: {lstm_out.shape} h_n: {h_n.shape} c_n: {c_n.shape}')
         out = self.classifier(self.dropout(torch.cat([c_n[i, :, :] for i in range(c_n.shape[0])], dim=1)))
+        out = torch.sigmoid(out)
         # logger.debug(f'Shape of out: {out.shape}')
         return out
