@@ -1,6 +1,11 @@
 import pandas as pd
 import os
+import logging
+import coloredlogs
 from config import config as cfg
+
+logger = logging.getLogger('data/liar_plus.py')
+coloredlogs.install(level='DEBUG', logger=logger)
 
 
 def prepare_tsv(tsv_path, mode='train'):
@@ -24,21 +29,33 @@ def prepare_tsv(tsv_path, mode='train'):
                                                 'false',
                                                 'half_true',
                                                 'mostly_true',
-                                                'pants_on_fire',
+                                                'pants_fire',
                                                 'context',
                                                 'justification'))
     # Remove incomplete rows
     df = df.dropna()
+
+    # Convert labels to integers
+    # See: https://stackoverflow.com/a/23307361
+    labels = {'true': 1,
+              'mostly-true': 2,
+              'half-true': 3,
+              'barely-true': 4,
+              'false': 5,
+              'pants-fire': 6}
+    df['label'] = df['label'].map(labels)
+    # See: https://stackoverflow.com/a/22391554
+    logger.info(f"{mode}_set stats:\n{df['label'].value_counts()}")
 
     # Remove line endings and replace by space
     df['statement'] = df['statement'].str.replace("\n", " ")
     df['context'] = df['context'].str.replace("\n", " ")
     df['justification'] = df['justification'].str.replace("\n", " ")
 
-    # Credits: https://stackoverflow.com/a/32529152
+    # See: https://stackoverflow.com/a/32529152
     df['text'] = df[['statement', 'justification', 'context']].apply(lambda x: ' '.join(x), axis=1)
 
-    # Credits: https://stackoverflow.com/a/33378952
+    # See: https://stackoverflow.com/a/33378952
     df['metadata'] = df.apply(lambda row: {'subjects': row['subjects'],
                                            'speaker': row['speaker'],
                                            'speaker_title': row['speaker_title'],
@@ -49,17 +66,20 @@ def prepare_tsv(tsv_path, mode='train'):
                                                'false': row['false'],
                                                'half_true': row['half_true'],
                                                'mostly_true': row['mostly_true'],
-                                               'pants_on_fire': row['pants_on_fire']
+                                               'pants_fire': row['pants_fire']
                                                 }
                                            }, axis=1)
 
-    # Credits: https://stackoverflow.com/a/34683105
+    # See: https://stackoverflow.com/a/34683105
     clean_df = df.filter(['text', 'label', 'metadata'])
+
+    # Serve up some rows for a sanity check
+    logger.info(f'Sanity check rows: \n{clean_df.head()}')
 
     # Save cleaned up files in cache/
     if mode == 'train':
-        clean_df.to_csv(os.path.join(cfg.project_root, 'cache', 'train.tsv'), sep='\t', index=False, header=False)
+        clean_df.to_csv(os.path.join(cfg.cleaned_dataset_root, 'train.tsv'), sep='\t', index=False, header=False)
     elif mode == 'val':
-        clean_df.to_csv(os.path.join(cfg.project_root, 'cache', 'val.tsv'), sep='\t', index=False, header=False)
+        clean_df.to_csv(os.path.join(cfg.cleaned_dataset_root, 'val.tsv'), sep='\t', index=False, header=False)
     elif mode == 'test':
-        clean_df.to_csv(os.path.join(cfg.project_root, 'cache', 'test.tsv'), sep='\t', index=False, header=False)
+        clean_df.to_csv(os.path.join(cfg.cleaned_dataset_root, 'test.tsv'), sep='\t', index=False, header=False)
