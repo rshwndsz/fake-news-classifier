@@ -1,10 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 import argparse
 import logging
 import coloredlogs
+from tqdm import tqdm
 import numpy as np
+import os
 from sklearn.metrics import accuracy_score
 
 from config import (config as cfg,
@@ -58,6 +61,7 @@ def train(model,
     val_record = []
     losses = []
 
+    logger.info('Training Model...')
     for epoch in range(resume_from_epoch, n_epochs):
         # Early Stopping
         if epoch >= warmup_epoch:
@@ -77,19 +81,24 @@ def train(model,
         train_loader.init_epoch()
 
         # Training in PyTorch
-        for train_batch in iter(train_loader):
-            logger.info('Training Model...')
+        for train_batch in tqdm(iter(train_loader)):
             step += 1
             # Set model in training mode
             model.train()
 
             # Move (text, label) to device
             text = train_batch.text.to(device)
-            label = train_batch.label.type(torch.Tensor).to(device)
+            label = train_batch.label.type(torch.LongTensor).to(device)
+            # See: https://discuss.pytorch.org/t/convert-int-into-one-hot-format/507/33
+            label = nn.functional.one_hot(label, num_classes=6).type(torch.FloatTensor)
+            logger.debug(f'Shape of label: {label.shape}')
+            logger.debug(f'Label: {label}')
+
             # Standard training loop
             model.zero_grad()
-            prediction = model.forward(text).view(-1)
-            # logger.debug(f'Shape of prediction: {prediction.shape}')
+            prediction = model.forward(text)
+            logger.debug(f'Shape of prediction: {prediction.shape}')
+            logger.debug(f'Prediction: {prediction}')
             loss = criterion(prediction, label)
 
             # Collect losses
@@ -111,18 +120,20 @@ def train(model,
                 for val_batch in iter(val_loader):
                     # Load (text, label) onto device
                     val_text = val_batch.text.to(device)
-                    val_label = val_batch.text.to(device).view(-1).float()
+                    val_label = val_batch.label.to(device).type(torch.LongTensor)
+                    val_label = nn.functional.one_hot(val_label, num_classes=6).type(torch.FloatTensor)
 
                     # Forward pass and collect loss
-                    val_prediction = model.forward(val_text).view(-1).to(device)
-                    val_loss.append(criterion(val_prediction, val_label).cpu().data.numpy())
+                    val_prediction = model.forward(val_text).to(device)
+                    val_loss.append(criterion(val_prediction, val_label).cpu().data.detach().numpy())
 
                     val_record.append({'step': step,
                                        'loss': np.mean(val_loss),
-                                       'accuracy': accuracy_score(val_label, val_prediction)
+                                       'accuracy': accuracy_score(val_label.view(-1).cpu().detach().numpy(),
+                                                                  val_prediction.view(-1).cpu().detach().numpy())
                                        })
 
-                    logger.info('step {}/epoch {} - train_loss {:.4f} - val_loss {:.4f} - val_acc {:4f}'.format(
+                    logger.info('step {}/ epoch {} - train_loss {:.4f} - val_loss {:.4f} - val_acc {:4f}'.format(
                         step, epoch, np.mean(losses), val_record[-1]['loss'], val_record[-1]['accuracy']))
 
                     # Save best model
@@ -141,21 +152,21 @@ def train(model,
 def save(m, info, binary):
     """Helper function to save model"""
     if binary:
-        torch.save(info, 'best_model_binary.info')
-        torch.save(m, 'best_model_binary.m')
+        torch.save(info, os.path.join(cfg.results_dir,'best_model_binary.info'))
+        torch.save(m, os.path.join(cfg.results_dir, 'best_model_binary.m'))
     else:
-        torch.save(info, 'best_model_hex.info')
-        torch.save(m, 'best_model_hex.m')
+        torch.save(info, os.path.join(cfg.results_dir, 'best_model_hex.info'))
+        torch.save(m, os.path.join(cfg.results_dir, 'best_model_hex.m'))
 
 
 def load(binary):
     """Helper function to load model"""
     if binary:
-        m = torch.load('best_model_binary.m')
-        info = torch.load('best_model_binary.info')
+        m = torch.load(os.path.join(cfg.results_dir, 'best_model_binary.m'))
+        info = torch.load(os.path.join(cfg.results_dir, 'best_model_binary.info'))
     else:
-        m = torch.load('best_model_hex.m')
-        info = torch.load('best_model_hex.info')
+        m = torch.load(os.path.join(cfg.results_dir, 'best_model_hex.m'))
+        info = torch.load(os.path.join(cfg.results_dir, 'best_model_hex.info'))
     return m, info
 
 
@@ -167,16 +178,26 @@ def test(test_loader, binary=False):
     model.lstm.flatten_parameters()
 
     model.eval()
+    model.zero_grad()
 
-    test_predictions = []
-    test_labels = []
-    test_loader.init_epoch()
+    test_loss = []
+    test_acc = []
+    step = 0
     for test_batch in iter(test_loader):
-        text = test_batch.text.to(cfg.device)
-        test_labels += test_batch.label.data.numpy().tolist()
-        test_predictions += torch.sigmoid(model.forward(text).view(-1)).cpu().data.numpy().tolist()
+        step += 1
+        # Load (text, label) onto device
+        test_text = test_batch.text.to(cfg.device)
+        test_label = test_batch.label.to(cfg.device).type(torch.LongTensor)
+        test_label = nn.functional.one_hot(test_label, num_classes=6).type(torch.FloatTensor)
 
-    # TODO Compute metrics
+        # Forward pass and collect loss
+        test_prediction = model.forward(test_text).to(cfg.device)
+        test_loss.append(criterion(test_prediction, test_label).cpu().data.detach().numpy())
+        test_acc.append(accuracy_score(test_label.view(-1).cpu().detach().numpy(),
+                                       test_prediction.view(-1).cpu().detach().numpy()))
+
+        logger.info('step {} - test_loss {:.4f} - test_acc {:4f}'.format(
+            step, np.mean(test_loss), np.mean(test_acc)))
 
 
 if __name__ == '__main__':
@@ -191,8 +212,8 @@ if __name__ == '__main__':
     elif args.binary == 'no':
         args.binary = False
 
-    model = arch.model_binary if args.binary else arch.model_hex
-    criterion = nn.BCEWithLogitsLoss()
+    model = arch.model
+    criterion = F.cross_entropy()
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()),
                            lr=cfg.lr)
 
@@ -215,7 +236,7 @@ if __name__ == '__main__':
               binary=args.binary)
 
     elif args.phase == 'test':
-        test(model)
+        test(model, args.binary)
 
     else:
-        raise ValueError('Choose one of train/test')
+        raise ValueError('Choose one of train/test.')
