@@ -8,14 +8,17 @@
       <w>kaggle</w>
       <w>levelname</w>
       <w>lstm</w>
+      <w>onehot</w>
       <w>optim</w>
       <w>pretrained</w>
+      <w>quora</w>
       <w>quotechar</w>
       <w>spacy</w>
       <w>tokenized</w>
       <w>visdom</w>
       <w>warmup</w>
       <w>yimin</w>
+      <w>ziliwang</w>
     </words>
   </dictionary>
 </component>

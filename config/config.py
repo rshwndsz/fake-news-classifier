@@ -9,7 +9,7 @@ num_workers = 4
 
 
 # Train/val-specific
-val_freq = 5
+val_freq = 500
 resume_from_epoch = 0
 
 
@@ -23,8 +23,8 @@ results_dir = os.path.join(project_root, 'results')
 
 
 # Hyper-parameters
-batch_size = 8
-val_batch_size = 8
-test_batch_size = 4
-n_epochs = 2
-lr = 0.01
+batch_size = 16
+val_batch_size = 16
+test_batch_size = 16
+n_epochs = 10
+lr = 0.005
