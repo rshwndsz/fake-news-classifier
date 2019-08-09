@@ -9,10 +9,8 @@ num_workers = 4
 
 
 # Train/val-specific
-print_freq = 20
-val_freq = 1
+val_freq = 500
 resume_from_epoch = 0
-min_val_loss = 1000
 
 
 # Data-specific
